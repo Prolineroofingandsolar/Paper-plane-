@@ -80,6 +80,7 @@ struct ContentView: View {
                             .opacity(0.9)
                     }
                 }
+                .allowsHitTesting(false)
             }
         }
         .preferredColorScheme(.dark)
