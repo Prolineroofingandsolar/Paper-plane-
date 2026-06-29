@@ -1,278 +1,274 @@
 import SpriteKit
-import SwiftUI
 
 class GameScene: SKScene, SKPhysicsContactDelegate {
 
     weak var gameState: GameState?
 
     // Nodes
-    private var plane: SKSpriteNode!
-    private var background: SKSpriteNode!
-    private var groundTop: SKNode!
-    private var groundBottom: SKNode!
+    private var plane: SKNode!
+    private var worldNode: SKNode!
+    private var bgNode: SKNode!
+
+    // Physics categories
+    private let planeCat: UInt32  = 0x1 << 0
+    private let wallCat: UInt32   = 0x1 << 1
+    private let scoreCat: UInt32  = 0x1 << 2
 
     // Game config
-    private let planeX: CGFloat = 120
-    private let gapSize: CGFloat = 220
-    private let pipeWidth: CGFloat = 70
-    private let pipeSpeed: CGFloat = 250
-    private var spawnInterval: TimeInterval = 2.2
-    private var gravity: CGFloat = -900
+    private let planeStartY: CGFloat = -100  // world coords (world scrolls down)
+    private var scrollSpeed: CGFloat = 160   // pts/sec downward scroll
+    private let platformGap: CGFloat = 130   // gap width the plane flies through
+    private let platformSpacing: CGFloat = 260 // vertical distance between platforms
+    private let brickSize: CGFloat = 24
 
     // State
     private var isRunning = false
-    private var isTapping = false
-    private var tapForce: CGFloat = 0
+    private var lastUpdate: TimeInterval = 0
+    private var worldY: CGFloat = 0           // how far world has scrolled
+    private var nextPlatformY: CGFloat = -500 // next platform spawn Y in world coords
+    private var platformCount: Int = 0
 
-    // Physics categories
-    private let planeCat: UInt32 = 0x1 << 0
-    private let obstacleCat: UInt32 = 0x1 << 1
-    private let scoreCat: UInt32 = 0x1 << 2
-    private let boundsCat: UInt32 = 0x1 << 3
+    // Input
+    private var touchX: CGFloat? = nil        // nil = no touch
 
     override func didMove(to view: SKView) {
+        backgroundColor = UIColor(white: 0.15, alpha: 1)
+        physicsWorld.gravity = .zero
         physicsWorld.contactDelegate = self
-        physicsWorld.gravity = CGVector(dx: 0, dy: 0)
-        setupBackground()
-        setupBounds()
+
+        worldNode = SKNode()
+        addChild(worldNode)
+
+        bgNode = SKNode()
+        addChild(bgNode)
+
+        buildBrickWalls()
         setupPlane()
+        spawnInitialPlatforms()
     }
 
-    // MARK: - Setup
+    // MARK: - Background brick walls
 
-    private func setupBackground() {
-        let gradient = SKShapeNode(rect: frame)
-        gradient.fillColor = .clear
-        gradient.strokeColor = .clear
+    private func buildBrickWalls() {
+        // Draw tiled brick texture on left/right side panels
+        // We'll just render them procedurally as the world scrolls
+    }
 
-        // Sky gradient using two rects
-        let skyTop = SKSpriteNode(color: UIColor(red: 0.4, green: 0.7, blue: 1.0, alpha: 1), size: CGSize(width: size.width, height: size.height * 0.7))
-        skyTop.position = CGPoint(x: size.width / 2, y: size.height * 0.65)
-        addChild(skyTop)
+    private func makeBrickStrip(x: CGFloat, y: CGFloat, w: CGFloat, h: CGFloat) -> SKShapeNode {
+        let strip = SKShapeNode(rectOf: CGSize(width: w, height: h))
+        strip.fillColor = UIColor(red: 0.38, green: 0.22, blue: 0.15, alpha: 1)
+        strip.strokeColor = .clear
+        strip.position = CGPoint(x: x, y: y)
+        strip.zPosition = 0
 
-        let skyBottom = SKSpriteNode(color: UIColor(red: 0.6, green: 0.85, blue: 1.0, alpha: 1), size: CGSize(width: size.width, height: size.height * 0.4))
-        skyBottom.position = CGPoint(x: size.width / 2, y: size.height * 0.2)
-        addChild(skyBottom)
+        // Brick lines overlay
+        let lines = SKNode()
+        let rows = Int(h / brickSize) + 1
+        for row in 0...rows {
+            let yOff = CGFloat(row) * brickSize - h / 2
+            let hLine = SKShapeNode(rectOf: CGSize(width: w, height: 1.5))
+            hLine.fillColor = UIColor(white: 0.1, alpha: 0.6)
+            hLine.strokeColor = .clear
+            hLine.position = CGPoint(x: 0, y: yOff)
+            lines.addChild(hLine)
 
-        // Clouds
-        for i in 0..<5 {
-            addCloud(x: CGFloat(i) * size.width / 4 + 60)
+            // Alternating vertical joints
+            let offset: CGFloat = (row % 2 == 0) ? 0 : brickSize * 1.5
+            var xOff = -w / 2 + offset
+            while xOff < w / 2 {
+                let vLine = SKShapeNode(rectOf: CGSize(width: 1.5, height: brickSize))
+                vLine.fillColor = UIColor(white: 0.1, alpha: 0.5)
+                vLine.strokeColor = .clear
+                vLine.position = CGPoint(x: xOff, y: yOff + brickSize / 2)
+                lines.addChild(vLine)
+                xOff += brickSize * 3
+            }
         }
+        strip.addChild(lines)
+        return strip
     }
 
-    private func addCloud(x: CGFloat) {
-        let cloud = SKNode()
-        let y = CGFloat.random(in: size.height * 0.4 ... size.height * 0.85)
-        cloud.position = CGPoint(x: x, y: y)
-
-        for offset in [CGPoint.zero, CGPoint(x: 30, y: 10), CGPoint(x: -25, y: 8)] {
-            let circle = SKShapeNode(circleOfRadius: CGFloat.random(in: 25...45))
-            circle.fillColor = .white
-            circle.strokeColor = .clear
-            circle.alpha = 0.85
-            circle.position = offset
-            cloud.addChild(circle)
-        }
-        cloud.zPosition = 1
-        addChild(cloud)
-    }
-
-    private func setupBounds() {
-        // Top bound
-        groundTop = SKNode()
-        groundTop.position = CGPoint(x: size.width / 2, y: size.height)
-        let topBody = SKPhysicsBody(rectangleOf: CGSize(width: size.width, height: 10))
-        topBody.isDynamic = false
-        topBody.categoryBitMask = boundsCat
-        topBody.contactTestBitMask = planeCat
-        groundTop.physicsBody = topBody
-        addChild(groundTop)
-
-        // Bottom bound
-        groundBottom = SKNode()
-        groundBottom.position = CGPoint(x: size.width / 2, y: 0)
-        let bottomBody = SKPhysicsBody(rectangleOf: CGSize(width: size.width, height: 10))
-        bottomBody.isDynamic = false
-        bottomBody.categoryBitMask = boundsCat
-        bottomBody.contactTestBitMask = planeCat
-        groundBottom.physicsBody = bottomBody
-        addChild(groundBottom)
-    }
+    // MARK: - Plane
 
     private func setupPlane() {
-        plane = SKSpriteNode()
-        plane.size = CGSize(width: 60, height: 35)
+        plane = SKNode()
+        plane.position = CGPoint(x: size.width / 2, y: size.height * 0.65)
+        plane.zPosition = 20
 
-        // Draw plane using shapes
+        // Paper plane shape
         let body = SKShapeNode()
         let path = UIBezierPath()
-        path.move(to: CGPoint(x: 30, y: 0))
-        path.addLine(to: CGPoint(x: -30, y: 12))
-        path.addLine(to: CGPoint(x: -20, y: 0))
-        path.addLine(to: CGPoint(x: -30, y: -10))
+        path.move(to: CGPoint(x: 20, y: 0))
+        path.addLine(to: CGPoint(x: -20, y: 8))
+        path.addLine(to: CGPoint(x: -12, y: 0))
+        path.addLine(to: CGPoint(x: -20, y: -7))
         path.close()
         body.path = path.cgPath
         body.fillColor = .white
-        body.strokeColor = UIColor(white: 0.8, alpha: 1)
-        body.lineWidth = 1.5
+        body.strokeColor = UIColor(white: 0.6, alpha: 1)
+        body.lineWidth = 1
 
-        // Wing
         let wing = SKShapeNode()
-        let wingPath = UIBezierPath()
-        wingPath.move(to: CGPoint(x: 0, y: 0))
-        wingPath.addLine(to: CGPoint(x: -10, y: 22))
-        wingPath.addLine(to: CGPoint(x: -22, y: 4))
-        wingPath.close()
-        wing.path = wingPath.cgPath
-        wing.fillColor = UIColor(white: 0.9, alpha: 1)
-        wing.strokeColor = UIColor(white: 0.75, alpha: 1)
+        let wp = UIBezierPath()
+        wp.move(to: CGPoint(x: 2, y: 0))
+        wp.addLine(to: CGPoint(x: -10, y: 16))
+        wp.addLine(to: CGPoint(x: -16, y: 2))
+        wp.close()
+        wing.path = wp.cgPath
+        wing.fillColor = UIColor(white: 0.85, alpha: 1)
+        wing.strokeColor = UIColor(white: 0.5, alpha: 1)
         wing.lineWidth = 1
 
-        plane.addChild(body)
         plane.addChild(wing)
-        plane.position = CGPoint(x: planeX, y: size.height / 2)
-        plane.zPosition = 10
+        plane.addChild(body)
 
-        let planeBody = SKPhysicsBody(rectangleOf: CGSize(width: 50, height: 28))
-        planeBody.isDynamic = true
-        planeBody.affectedByGravity = false
-        planeBody.categoryBitMask = planeCat
-        planeBody.contactTestBitMask = obstacleCat | boundsCat
-        planeBody.collisionBitMask = 0
-        planeBody.restitution = 0
-        plane.physicsBody = planeBody
+        let physBody = SKPhysicsBody(rectangleOf: CGSize(width: 32, height: 16))
+        physBody.isDynamic = true
+        physBody.affectedByGravity = false
+        physBody.categoryBitMask = planeCat
+        physBody.contactTestBitMask = wallCat | scoreCat
+        physBody.collisionBitMask = 0
+        physBody.allowsRotation = false
+        plane.physicsBody = physBody
 
         addChild(plane)
     }
 
-    // MARK: - Game Flow
+    // MARK: - Platforms
 
-    private func startGame() {
-        isRunning = true
-        DispatchQueue.main.async { self.gameState?.hasStarted = true }
-        spawnPipes()
+    private func spawnInitialPlatforms() {
+        for i in 0..<8 {
+            spawnPlatform(atWorldY: CGFloat(i) * -platformSpacing - 500)
+        }
     }
 
-    private func spawnPipes() {
-        guard isRunning else { return }
+    private func spawnPlatform(atWorldY wy: CGFloat) {
+        let channelWidth: CGFloat = size.width * 0.55
+        let wallW = (size.width - channelWidth) / 2
 
-        let gapCenter = CGFloat.random(in: size.height * 0.25 ... size.height * 0.75)
-        let topHeight = size.height - (gapCenter + gapSize / 2)
-        let bottomHeight = gapCenter - gapSize / 2
+        // Randomly position the gap: left-biased, center, or right-biased
+        let positions: [CGFloat] = [
+            wallW / 2,                          // gap near left
+            size.width / 2,                     // gap center
+            size.width - wallW / 2              // gap near right
+        ]
+        let gapCenterX = positions[Int.random(in: 0..<positions.count)]
 
-        // Top pipe
-        let topPipe = makeCloudPipe(height: topHeight)
-        topPipe.position = CGPoint(x: size.width + pipeWidth / 2, y: size.height - topHeight / 2)
-        addChild(topPipe)
-        topPipe.run(SKAction.sequence([
-            SKAction.moveBy(x: -(size.width + pipeWidth + 20), y: 0, duration: (size.width + pipeWidth + 20) / pipeSpeed),
-            SKAction.removeFromParent()
-        ]))
+        let platformNode = SKNode()
+        platformNode.position = CGPoint(x: 0, y: wy)
+        platformNode.zPosition = 5
 
-        // Bottom pipe
-        let bottomPipe = makeCloudPipe(height: bottomHeight)
-        bottomPipe.position = CGPoint(x: size.width + pipeWidth / 2, y: bottomHeight / 2)
-        addChild(bottomPipe)
-        bottomPipe.run(SKAction.sequence([
-            SKAction.moveBy(x: -(size.width + pipeWidth + 20), y: 0, duration: (size.width + pipeWidth + 20) / pipeSpeed),
-            SKAction.removeFromParent()
-        ]))
+        let platformH: CGFloat = 18
 
-        // Score sensor
+        // Left wall panel
+        let lw = gapCenterX - platformGap / 2
+        if lw > 0 {
+            let left = makeWallSegment(width: lw, height: platformH)
+            left.position = CGPoint(x: lw / 2, y: 0)
+            platformNode.addChild(left)
+        }
+
+        // Right wall panel
+        let rStart = gapCenterX + platformGap / 2
+        let rw = size.width - rStart
+        if rw > 0 {
+            let right = makeWallSegment(width: rw, height: platformH)
+            right.position = CGPoint(x: rStart + rw / 2, y: 0)
+            platformNode.addChild(right)
+        }
+
+        // Score sensor (invisible, in the gap)
         let sensor = SKNode()
-        sensor.position = CGPoint(x: size.width + pipeWidth / 2 + 35, y: size.height / 2)
-        let sensorBody = SKPhysicsBody(rectangleOf: CGSize(width: 10, height: size.height))
-        sensorBody.isDynamic = false
-        sensorBody.categoryBitMask = scoreCat
-        sensorBody.contactTestBitMask = planeCat
-        sensorBody.collisionBitMask = 0
-        sensor.physicsBody = sensorBody
-        sensor.zPosition = 5
-        addChild(sensor)
-        sensor.run(SKAction.sequence([
-            SKAction.moveBy(x: -(size.width + pipeWidth + 60), y: 0, duration: (size.width + pipeWidth + 60) / pipeSpeed),
-            SKAction.removeFromParent()
-        ]))
+        sensor.position = CGPoint(x: gapCenterX, y: 0)
+        let sb = SKPhysicsBody(rectangleOf: CGSize(width: platformGap - 10, height: 10))
+        sb.isDynamic = false
+        sb.categoryBitMask = scoreCat
+        sb.contactTestBitMask = planeCat
+        sb.collisionBitMask = 0
+        sensor.physicsBody = sb
+        platformNode.addChild(sensor)
 
-        let wait = SKAction.wait(forDuration: spawnInterval)
-        run(SKAction.sequence([wait, SKAction.run { [weak self] in self?.spawnPipes() }]))
+        worldNode.addChild(platformNode)
+        nextPlatformY = wy - platformSpacing
+        platformCount += 1
+
+        // Brick walls on left and right edges
+        let sideW: CGFloat = 30
+        let brickH: CGFloat = platformSpacing + 40
+        let leftBrick = makeBrickStrip(x: sideW / 2, y: wy - brickH / 2, w: sideW, h: brickH)
+        leftBrick.zPosition = 1
+        worldNode.addChild(leftBrick)
+        let rightBrick = makeBrickStrip(x: size.width - sideW / 2, y: wy - brickH / 2, w: sideW, h: brickH)
+        rightBrick.zPosition = 1
+        worldNode.addChild(rightBrick)
     }
 
-    private func makeCloudPipe(height: CGFloat) -> SKNode {
+    private func makeWallSegment(width: CGFloat, height: CGFloat) -> SKNode {
         let node = SKNode()
-        node.zPosition = 3
 
-        let rect = SKShapeNode(rectOf: CGSize(width: pipeWidth, height: height), cornerRadius: 8)
-        rect.fillColor = UIColor(red: 0.85, green: 0.95, blue: 1.0, alpha: 1)
-        rect.strokeColor = UIColor(red: 0.7, green: 0.85, blue: 0.95, alpha: 1)
-        rect.lineWidth = 2
+        let rect = SKShapeNode(rectOf: CGSize(width: width, height: height))
+        rect.fillColor = UIColor(white: 0.75, alpha: 1)
+        rect.strokeColor = UIColor(white: 0.5, alpha: 1)
+        rect.lineWidth = 1.5
         node.addChild(rect)
 
-        let body = SKPhysicsBody(rectangleOf: CGSize(width: pipeWidth, height: height))
-        body.isDynamic = false
-        body.categoryBitMask = obstacleCat
-        body.contactTestBitMask = planeCat
-        node.physicsBody = body
+        let physBody = SKPhysicsBody(rectangleOf: CGSize(width: width, height: height))
+        physBody.isDynamic = false
+        physBody.categoryBitMask = wallCat
+        physBody.contactTestBitMask = planeCat
+        node.physicsBody = physBody
 
         return node
     }
 
-    private func endGame() {
-        isRunning = false
-        removeAllActions()
-        plane.physicsBody?.velocity = .zero
-
-        // Shake effect
-        let shake = SKAction.sequence([
-            SKAction.moveBy(x: -10, y: 0, duration: 0.05),
-            SKAction.moveBy(x: 20, y: 0, duration: 0.05),
-            SKAction.moveBy(x: -10, y: 0, duration: 0.05)
-        ])
-        plane.run(shake)
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-            self.gameState?.triggerGameOver()
-        }
-    }
-
-    // MARK: - Update
+    // MARK: - Game loop
 
     override func update(_ currentTime: TimeInterval) {
-        guard isRunning, let body = plane.physicsBody else { return }
+        guard isRunning else { return }
 
-        let gravityVelocity: CGFloat = isTapping ? 450 : gravity
-        let currentVY = body.velocity.dy
-        let targetVY = gravityVelocity
-        body.velocity.dy = currentVY + (targetVY - currentVY) * 0.15
+        let dt = lastUpdate == 0 ? 0 : min(currentTime - lastUpdate, 0.05)
+        lastUpdate = currentTime
 
-        // Clamp velocity
-        body.velocity.dy = max(-600, min(600, body.velocity.dy))
+        // Scroll world upward (plane falls down visually)
+        worldY -= scrollSpeed * CGFloat(dt)
+        worldNode.position.y = worldY
 
-        // Tilt plane based on velocity
-        let tilt = atan2(Double(body.velocity.dy), 350.0)
-        plane.zRotation = CGFloat(tilt * 0.8)
+        // Increase speed over time
+        scrollSpeed = min(scrollSpeed + CGFloat(dt) * 4, 350)
 
-        // Keep in bounds
-        if plane.position.y > size.height - 20 || plane.position.y < 20 {
+        // Move plane left/right toward touch
+        if let tx = touchX {
+            let targetX = tx
+            let currentX = plane.position.x
+            let newX = currentX + (targetX - currentX) * min(CGFloat(dt) * 8, 1)
+            plane.position.x = max(35, min(size.width - 35, newX))
+        }
+
+        // Tilt plane based on horizontal movement
+        if let tx = touchX {
+            let dx = tx - plane.position.x
+            plane.zRotation = CGFloat(atan2(Double(-dx * 0.3), 60))
+        } else {
+            plane.zRotation *= 0.9
+        }
+
+        // Spawn more platforms as we scroll
+        let visibleWorldTop = -worldY + size.height
+        if nextPlatformY > visibleWorldTop - size.height * 2 {
+            spawnPlatform(atWorldY: nextPlatformY)
+        }
+
+        // Remove platforms that have scrolled far above screen
+        for child in worldNode.children {
+            if child.position.y + worldY > size.height + 200 {
+                child.removeFromParent()
+            }
+        }
+
+        // Kill if plane goes off screen sides
+        if plane.position.x < 10 || plane.position.x > size.width - 10 {
             endGame()
         }
-    }
-
-    // MARK: - Touch
-
-    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
-        if !isRunning && !(gameState?.isGameOver ?? false) {
-            startGame()
-        }
-        isTapping = true
-    }
-
-    override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
-        isTapping = false
-    }
-
-    override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
-        isTapping = false
     }
 
     // MARK: - Contact
@@ -282,18 +278,67 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
 
         if masks == planeCat | scoreCat {
             DispatchQueue.main.async { self.gameState?.addPoint() }
-            // Remove sensor so it only scores once
             if contact.bodyA.categoryBitMask == scoreCat {
-                contact.bodyA.node?.removeFromParent()
+                contact.bodyA.node?.physicsBody = nil
             } else {
-                contact.bodyB.node?.removeFromParent()
+                contact.bodyB.node?.physicsBody = nil
             }
-        } else if masks == planeCat | obstacleCat || masks == planeCat | boundsCat {
+        } else if masks == planeCat | wallCat {
             if isRunning { endGame() }
         }
     }
 
-    // MARK: - Scene reset
+    // MARK: - Touch
+
+    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
+        guard let touch = touches.first else { return }
+        touchX = touch.location(in: self).x
+
+        if !isRunning && !(gameState?.isGameOver ?? false) {
+            startGame()
+        }
+    }
+
+    override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
+        touchX = touches.first?.location(in: self).x
+    }
+
+    override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
+        touchX = nil
+    }
+
+    override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
+        touchX = nil
+    }
+
+    // MARK: - Flow
+
+    private func startGame() {
+        isRunning = true
+        scrollSpeed = 160
+        DispatchQueue.main.async { self.gameState?.hasStarted = true }
+    }
+
+    private func endGame() {
+        guard isRunning else { return }
+        isRunning = false
+        touchX = nil
+
+        // Flash plane red
+        let flash = SKAction.sequence([
+            SKAction.colorize(with: .red, colorBlendFactor: 1, duration: 0.1),
+            SKAction.colorize(with: .white, colorBlendFactor: 0, duration: 0.1),
+            SKAction.repeat(SKAction.sequence([
+                SKAction.colorize(with: .red, colorBlendFactor: 1, duration: 0.08),
+                SKAction.colorize(with: .white, colorBlendFactor: 0, duration: 0.08)
+            ]), count: 3)
+        ])
+        plane.children.forEach { ($0 as? SKShapeNode).map { $0.run(flash) } }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+            self.gameState?.triggerGameOver()
+        }
+    }
 
     override func willMove(from view: SKView) {
         removeAllChildren()

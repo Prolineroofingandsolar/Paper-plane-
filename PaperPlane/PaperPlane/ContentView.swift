@@ -19,78 +19,88 @@ struct ContentView: View {
             VStack {
                 HStack {
                     Spacer()
-                    Text("Score: \(gameState.score)")
-                        .font(.system(size: 28, weight: .bold, design: .rounded))
-                        .foregroundColor(.white)
-                        .shadow(color: .black.opacity(0.4), radius: 4)
-                        .padding()
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text(String(format: "%03d", gameState.score))
+                            .font(.system(size: 32, weight: .bold, design: .monospaced))
+                            .foregroundColor(.white)
+                        Text("HI \(String(format: "%03d", gameState.bestScore))")
+                            .font(.system(size: 14, weight: .bold, design: .monospaced))
+                            .foregroundColor(Color(white: 0.7))
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 12)
                 }
                 Spacer()
             }
 
             if gameState.isGameOver {
-                GameOverView(score: gameState.score, bestScore: gameState.bestScore) {
-                    gameState.reset()
+                RetroOverlay {
+                    VStack(spacing: 12) {
+                        Text("GAME OVER")
+                            .font(.system(size: 30, weight: .heavy, design: .monospaced))
+                            .foregroundColor(.white)
+                        Text(String(format: "SCORE  %03d", gameState.score))
+                            .font(.system(size: 18, weight: .bold, design: .monospaced))
+                            .foregroundColor(.yellow)
+                        Text(String(format: "BEST   %03d", gameState.bestScore))
+                            .font(.system(size: 18, weight: .bold, design: .monospaced))
+                            .foregroundColor(Color(white: 0.8))
+                        Spacer().frame(height: 8)
+                        Button(action: { gameState.reset() }) {
+                            Text("[ PLAY AGAIN ]")
+                                .font(.system(size: 18, weight: .bold, design: .monospaced))
+                                .foregroundColor(.black)
+                                .padding(.horizontal, 24)
+                                .padding(.vertical, 10)
+                                .background(Color.white)
+                                .cornerRadius(4)
+                        }
+                    }
                 }
             }
 
             if !gameState.hasStarted && !gameState.isGameOver {
-                StartView()
+                RetroOverlay {
+                    VStack(spacing: 14) {
+                        Text("✈")
+                            .font(.system(size: 60))
+                        Text("PAPER PLANE")
+                            .font(.system(size: 26, weight: .heavy, design: .monospaced))
+                            .foregroundColor(.white)
+                        Text("CHASE")
+                            .font(.system(size: 22, weight: .bold, design: .monospaced))
+                            .foregroundColor(.yellow)
+                        Spacer().frame(height: 6)
+                        Text("TAP & DRAG TO STEER")
+                            .font(.system(size: 13, weight: .medium, design: .monospaced))
+                            .foregroundColor(Color(white: 0.7))
+                        Text("TAP TO START")
+                            .font(.system(size: 15, weight: .bold, design: .monospaced))
+                            .foregroundColor(.white)
+                            .opacity(0.9)
+                    }
+                }
             }
         }
+        .preferredColorScheme(.dark)
     }
 }
 
-struct StartView: View {
+struct RetroOverlay<Content: View>: View {
+    let content: () -> Content
     var body: some View {
-        VStack(spacing: 16) {
-            Text("✈️")
-                .font(.system(size: 80))
-            Text("Paper Plane")
-                .font(.system(size: 40, weight: .heavy, design: .rounded))
-                .foregroundColor(.white)
-            Text("Tap to fly!")
-                .font(.system(size: 22, weight: .medium, design: .rounded))
-                .foregroundColor(.white.opacity(0.8))
-        }
-        .padding(40)
-        .background(.ultraThinMaterial)
-        .cornerRadius(24)
-        .shadow(radius: 20)
-    }
-}
-
-struct GameOverView: View {
-    let score: Int
-    let bestScore: Int
-    let onRestart: () -> Void
-
-    var body: some View {
-        VStack(spacing: 20) {
-            Text("Game Over")
-                .font(.system(size: 38, weight: .heavy, design: .rounded))
-                .foregroundColor(.white)
-            VStack(spacing: 8) {
-                Text("Score: \(score)")
-                    .font(.system(size: 26, weight: .bold, design: .rounded))
-                    .foregroundColor(.yellow)
-                Text("Best: \(bestScore)")
-                    .font(.system(size: 20, weight: .medium, design: .rounded))
-                    .foregroundColor(.white.opacity(0.8))
+        ZStack {
+            Color.black.opacity(0.6).ignoresSafeArea()
+            VStack {
+                content()
             }
-            Button(action: onRestart) {
-                Text("Play Again")
-                    .font(.system(size: 22, weight: .bold, design: .rounded))
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 40)
-                    .padding(.vertical, 14)
-                    .background(Color.blue)
-                    .cornerRadius(30)
-            }
+            .padding(32)
+            .background(Color(white: 0.12))
+            .overlay(
+                RoundedRectangle(cornerRadius: 6)
+                    .stroke(Color.white.opacity(0.4), lineWidth: 2)
+            )
+            .cornerRadius(6)
         }
-        .padding(40)
-        .background(.ultraThinMaterial)
-        .cornerRadius(24)
-        .shadow(radius: 20)
     }
 }
