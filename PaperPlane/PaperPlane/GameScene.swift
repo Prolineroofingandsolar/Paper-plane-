@@ -353,13 +353,28 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         guard isRunning else { return }
         isRunning = false
 
-        let flash = SKAction.repeat(SKAction.sequence([
-            SKAction.colorize(with: .red, colorBlendFactor: 1, duration: 0.07),
-            SKAction.colorize(with: .white, colorBlendFactor: 0, duration: 0.07)
-        ]), count: 4)
-        plane.children.forEach { ($0 as? SKShapeNode)?.run(flash) }
+        // Freeze all platform nodes so the plane doesn't appear to slide through
+        children.forEach { node in
+            guard node !== plane else { return }
+            if node.children.contains(where: { $0.physicsBody?.categoryBitMask == slabCat }) {
+                node.removeAllActions()
+            }
+        }
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+        // Flash plane shapes red immediately
+        plane.children.forEach { ($0 as? SKShapeNode)?.fillColor = .red }
+
+        // Slam → spin out and fade
+        plane.run(SKAction.sequence([
+            SKAction.scale(to: 1.5, duration: 0.07),
+            SKAction.group([
+                SKAction.scale(to: 0.15, duration: 0.45),
+                SKAction.rotate(byAngle: .pi * 2.5, duration: 0.45),
+                SKAction.fadeOut(withDuration: 0.45)
+            ])
+        ]))
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.55) {
             self.gameState?.triggerGameOver()
         }
     }
