@@ -21,14 +21,21 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
     private let straightenRate: CGFloat = 1.3    // how fast angle returns to 0
     private let forwardSpeed: CGFloat  = 270     // pixels/sec along heading
 
+    // Pitch (nose-up stall)
+    private var pitchAngle: CGFloat      = 0
+    private let maxPitch: CGFloat        = 0.55
+    private let tapPitch: CGFloat        = 0.40
+    private let pitchDecay: CGFloat      = 1.8
+
     // Scroll
-    private var scrollSpeed: CGFloat   = 200
+    private var scrollSpeed: CGFloat     = 180
+    private var effectiveScroll: CGFloat = 180
 
     // State
     private var isRunning  = false
     private var lastUpdate: TimeInterval = 0
     private var spawnTimer: TimeInterval = 0
-    private var spawnInterval: TimeInterval = 1.9
+    private var spawnInterval: TimeInterval = 1.2
     private var nextSideIsLeft: Bool = true
 
     // MARK: - Setup
@@ -162,7 +169,7 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         addChild(node)
 
         let dist = size.height + h + 30
-        let dur  = TimeInterval(dist / scrollSpeed)
+        let dur  = TimeInterval(dist / max(effectiveScroll, 60))
         node.run(SKAction.sequence([
             SKAction.moveBy(x: 0, y: dist, duration: dur),
             SKAction.removeFromParent()
@@ -218,7 +225,13 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
 
         // Ramp up
         scrollSpeed   = min(scrollSpeed + CGFloat(dt) * 5, 420)
-        spawnInterval = max(0.95, spawnInterval - dt * 0.004)
+        spawnInterval = max(0.6, spawnInterval - dt * 0.004)
+
+        // Pitch decay — nose falls back to level naturally
+        pitchAngle -= pitchAngle * pitchDecay * CGFloat(dt)
+
+        // Effective scroll is reduced when nose is pitched up (stall)
+        effectiveScroll = scrollSpeed * (1.0 - pitchAngle * 0.6)
 
         // Spawn
         spawnTimer += dt
@@ -246,8 +259,8 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
 
         plane.position.x = newX
 
-        // Visual rotation — nose points in direction of travel
-        let targetRotation = -planeAngle
+        // Visual rotation — banking + nose-up pitch combined
+        let targetRotation = -planeAngle + pitchAngle * 0.5
         plane.zRotation += (targetRotation - plane.zRotation) * 0.25
     }
 
@@ -285,6 +298,7 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
 
         guard isRunning else { return }
         let tapX = touch.location(in: self).x
+        pitchAngle = min(maxPitch, pitchAngle + tapPitch)   // nose up on every tap
         if tapX < size.width / 2 {
             planeAngle = max(-maxAngle, planeAngle - tapRotation)   // bank left
         } else {
@@ -295,10 +309,12 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
     // MARK: - Flow
 
     private func startGame() {
-        isRunning     = true
-        spawnTimer    = spawnInterval   // trigger first platform immediately
-        scrollSpeed   = 200
-        planeAngle    = 0
+        isRunning       = true
+        spawnTimer      = spawnInterval   // trigger first platform immediately
+        scrollSpeed     = 180
+        effectiveScroll = 180
+        planeAngle      = 0
+        pitchAngle      = 0
         DispatchQueue.main.async { self.gameState?.hasStarted = true }
     }
 
