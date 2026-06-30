@@ -92,35 +92,62 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         plane.position = CGPoint(x: size.width / 2, y: size.height * 0.68)
         plane.zPosition = 20
 
-        // Plane points DOWNWARD — nose at bottom
-        let bodyShape = SKShapeNode()
-        let path = UIBezierPath()
-        path.move(to: CGPoint(x: 0, y: -20))     // nose (bottom)
-        path.addLine(to: CGPoint(x: -11, y: 14))  // left tail
-        path.addLine(to: CGPoint(x: 0, y:  7))    // tail notch
-        path.addLine(to: CGPoint(x: 11, y: 14))   // right tail
-        path.close()
-        bodyShape.path = path.cgPath
-        bodyShape.fillColor = selectedSkin.bodyColor
-        bodyShape.strokeColor = selectedSkin.strokeColor
-        bodyShape.lineWidth = 1.5
+        // Body / fuselage — dart shape, nose at bottom
+        let body = SKShapeNode()
+        let bp = UIBezierPath()
+        bp.move(to:    CGPoint(x:  0,  y: -22))
+        bp.addLine(to: CGPoint(x:  3,  y:  -8))
+        bp.addLine(to: CGPoint(x:  2,  y:  14))
+        bp.addLine(to: CGPoint(x:  0,  y:  10))
+        bp.addLine(to: CGPoint(x: -2,  y:  14))
+        bp.addLine(to: CGPoint(x: -3,  y:  -8))
+        bp.close()
+        body.path = bp.cgPath
+        body.fillColor = selectedSkin.bodyColor
+        body.strokeColor = selectedSkin.strokeColor
+        body.lineWidth = 1.2
 
-        // Wing — left side
-        let wingShape = SKShapeNode()
-        let wp = UIBezierPath()
-        wp.move(to: CGPoint(x: -1, y: 4))
-        wp.addLine(to: CGPoint(x: -20, y: 2))
-        wp.addLine(to: CGPoint(x: -8, y: -4))
-        wp.close()
-        wingShape.path = wp.cgPath
-        wingShape.fillColor = selectedSkin.wingColor
-        wingShape.strokeColor = selectedSkin.strokeColor
-        wingShape.lineWidth = 1
+        // Right wing — swept back
+        let rWing = SKShapeNode()
+        let rp = UIBezierPath()
+        rp.move(to:    CGPoint(x:  2,  y:  -6))
+        rp.addLine(to: CGPoint(x: 22,  y:   4))
+        rp.addLine(to: CGPoint(x:  8,  y:  10))
+        rp.addLine(to: CGPoint(x:  2,  y:   6))
+        rp.close()
+        rWing.path = rp.cgPath
+        rWing.fillColor = selectedSkin.wingColor
+        rWing.strokeColor = selectedSkin.strokeColor
+        rWing.lineWidth = 1
 
-        plane.addChild(wingShape)
-        plane.addChild(bodyShape)
+        // Left wing — mirror of right
+        let lWing = SKShapeNode()
+        let lp = UIBezierPath()
+        lp.move(to:    CGPoint(x: -2,  y:  -6))
+        lp.addLine(to: CGPoint(x: -22, y:   4))
+        lp.addLine(to: CGPoint(x: -8,  y:  10))
+        lp.addLine(to: CGPoint(x: -2,  y:   6))
+        lp.close()
+        lWing.path = lp.cgPath
+        lWing.fillColor = selectedSkin.wingColor
+        lWing.strokeColor = selectedSkin.strokeColor
+        lWing.lineWidth = 1
 
-        let pb = SKPhysicsBody(rectangleOf: CGSize(width: 18, height: 30))
+        // Centre crease fold line
+        let crease = SKShapeNode()
+        let cp = UIBezierPath()
+        cp.move(to:    CGPoint(x: 0, y: -20))
+        cp.addLine(to: CGPoint(x: 0, y:  12))
+        crease.path = cp.cgPath
+        crease.strokeColor = selectedSkin.strokeColor.withAlphaComponent(0.5)
+        crease.lineWidth = 0.8
+
+        plane.addChild(lWing)
+        plane.addChild(rWing)
+        plane.addChild(body)
+        plane.addChild(crease)
+
+        let pb = SKPhysicsBody(rectangleOf: CGSize(width: 22, height: 32))
         pb.isDynamic = true
         pb.affectedByGravity = false
         pb.categoryBitMask = planeCat
@@ -243,8 +270,9 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         // Aerodynamic straightening — angle drifts back toward 0
         planeAngle -= planeAngle * straightenRate * CGFloat(dt)
 
-        // Horizontal drift from angle
-        let dx = sin(planeAngle) * forwardSpeed * CGFloat(dt)
+        // Horizontal drift — steeper bank = faster lateral movement
+        let lateralSpeed = forwardSpeed * (1.0 + abs(planeAngle) * 1.5)
+        let dx = sin(planeAngle) * lateralSpeed * CGFloat(dt)
         var newX = plane.position.x + dx
         newX = max(sideWallW + 16, min(size.width - sideWallW - 16, newX))
 
