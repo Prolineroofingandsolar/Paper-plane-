@@ -12,6 +12,9 @@
 		AA000001000000000000000C /* GameScene.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000002000000000000000C /* GameScene.swift */; };
 		AA000001000000000000000D /* GameState.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000002000000000000000D /* GameState.swift */; };
 		AA000001000000000000000E /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AA000002000000000000000E /* Assets.xcassets */; };
+		AA0000010000000000000010 /* PlaneSkin.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000020000000000000010 /* PlaneSkin.swift */; };
+		AA0000010000000000000011 /* MenuView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000020000000000000011 /* MenuView.swift */; };
+		AA0000010000000000000012 /* CustomizeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000020000000000000012 /* CustomizeView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -21,6 +24,9 @@
 		AA000002000000000000000D /* GameState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameState.swift; sourceTree = "<group>"; };
 		AA000002000000000000000E /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		AA000002000000000000000F /* PaperPlane.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PaperPlane.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		AA0000020000000000000010 /* PlaneSkin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaneSkin.swift; sourceTree = "<group>"; };
+		AA0000020000000000000011 /* MenuView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuView.swift; sourceTree = "<group>"; };
+		AA0000020000000000000012 /* CustomizeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomizeView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -50,6 +56,9 @@
 				AA000002000000000000000C /* GameScene.swift */,
 				AA000002000000000000000D /* GameState.swift */,
 				AA000002000000000000000E /* Assets.xcassets */,
+				AA0000020000000000000010 /* PlaneSkin.swift */,
+				AA0000020000000000000011 /* MenuView.swift */,
+				AA0000020000000000000012 /* CustomizeView.swift */,
 			);
 			path = PaperPlane;
 			sourceTree = "<group>";
@@ -135,6 +144,9 @@
 				AA000001000000000000000B /* ContentView.swift in Sources */,
 				AA000001000000000000000C /* GameScene.swift in Sources */,
 				AA000001000000000000000D /* GameState.swift in Sources */,
+				AA0000010000000000000010 /* PlaneSkin.swift in Sources */,
+				AA0000010000000000000011 /* MenuView.swift in Sources */,
+				AA0000010000000000000012 /* CustomizeView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

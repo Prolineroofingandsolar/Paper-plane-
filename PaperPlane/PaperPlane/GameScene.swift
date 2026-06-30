@@ -3,6 +3,7 @@ import SpriteKit
 class GameScene: SKScene, SKPhysicsContactDelegate {
 
     weak var gameState: GameState?
+    var selectedSkin: PlaneSkin = PlaneSkin.all[0]
 
     private var plane: SKNode!
 
@@ -93,8 +94,8 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         path.addLine(to: CGPoint(x: 11, y: 14))   // right tail
         path.close()
         bodyShape.path = path.cgPath
-        bodyShape.fillColor = .white
-        bodyShape.strokeColor = UIColor(white: 0.55, alpha: 1)
+        bodyShape.fillColor = selectedSkin.bodyColor
+        bodyShape.strokeColor = selectedSkin.strokeColor
         bodyShape.lineWidth = 1.5
 
         // Wing — left side
@@ -105,8 +106,8 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         wp.addLine(to: CGPoint(x: -8, y: -4))
         wp.close()
         wingShape.path = wp.cgPath
-        wingShape.fillColor = UIColor(white: 0.86, alpha: 1)
-        wingShape.strokeColor = UIColor(white: 0.5, alpha: 1)
+        wingShape.fillColor = selectedSkin.wingColor
+        wingShape.strokeColor = selectedSkin.strokeColor
         wingShape.lineWidth = 1
 
         plane.addChild(wingShape)
