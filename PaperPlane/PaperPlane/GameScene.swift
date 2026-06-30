@@ -36,7 +36,7 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
     private var lastUpdate: TimeInterval = 0
     private var spawnTimer: TimeInterval = 0
     private var spawnInterval: TimeInterval = 1.2
-    private var nextSideIsLeft: Bool = true
+    private var lastSideWasLeft: Bool? = nil
 
     // MARK: - Setup
 
@@ -172,7 +172,11 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         node.position = CGPoint(x: 0, y: -h)
         node.zPosition = 5
 
-        if nextSideIsLeft {
+        var spawnLeft: Bool
+        repeat { spawnLeft = Bool.random() } while spawnLeft == lastSideWasLeft
+        lastSideWasLeft = spawnLeft
+
+        if spawnLeft {
             // Bar from LEFT wall — open gap on the right
             let slab = makeSlab(width: barW, height: h)
             slab.position = CGPoint(x: sideWallW + barW / 2, y: 0)
@@ -191,7 +195,6 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
             sensor.position = CGPoint(x: sideWallW + openW / 2, y: h + 6)
             node.addChild(sensor)
         }
-        nextSideIsLeft.toggle()
 
         addChild(node)
 
