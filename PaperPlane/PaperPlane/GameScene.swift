@@ -12,7 +12,6 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
 
     // Layout
     private let sideWallW: CGFloat = 30
-    private let gapWidth: CGFloat  = 145
 
     // Flight physics
     private var planeAngle: CGFloat    = 0       // 0 = straight down, + = tilted right
@@ -29,6 +28,7 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
     private var lastUpdate: TimeInterval = 0
     private var spawnTimer: TimeInterval = 0
     private var spawnInterval: TimeInterval = 1.9
+    private var nextSideIsLeft: Bool = true
 
     // MARK: - Setup
 
@@ -127,44 +127,36 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
     // MARK: - Platform spawning
 
     private func spawnPlatform() {
-        let playLeft  = sideWallW + 8
-        let playRight = size.width - sideWallW - 8
-        let minGap    = playLeft  + gapWidth / 2
-        let maxGap    = playRight - gapWidth / 2
-        let gapCX     = CGFloat.random(in: minGap...maxGap)
+        let playableW = size.width - sideWallW * 2
+        let barCoverage = CGFloat.random(in: 0.52...0.65)
+        let barW = playableW * barCoverage
+        let openW = playableW - barW
+        let h: CGFloat = 20
 
-        let h: CGFloat = 22
         let node = SKNode()
         node.position = CGPoint(x: 0, y: -h)
         node.zPosition = 5
 
-        // Left slab
-        let leftW = gapCX - gapWidth / 2 - sideWallW
-        if leftW > 4 {
-            let s = makeSlab(width: leftW, height: h)
-            s.position = CGPoint(x: sideWallW + leftW / 2, y: 0)
-            node.addChild(s)
-        }
+        if nextSideIsLeft {
+            // Bar from LEFT wall — open gap on the right
+            let slab = makeSlab(width: barW, height: h)
+            slab.position = CGPoint(x: sideWallW + barW / 2, y: 0)
+            node.addChild(slab)
 
-        // Right slab
-        let gapEnd = gapCX + gapWidth / 2
-        let rightW = size.width - sideWallW - gapEnd
-        if rightW > 4 {
-            let s = makeSlab(width: rightW, height: h)
-            s.position = CGPoint(x: gapEnd + rightW / 2, y: 0)
-            node.addChild(s)
-        }
+            let sensor = makeScoreSensor(width: openW, height: h)
+            sensor.position = CGPoint(x: sideWallW + barW + openW / 2, y: h + 6)
+            node.addChild(sensor)
+        } else {
+            // Bar from RIGHT wall — open gap on the left
+            let slab = makeSlab(width: barW, height: h)
+            slab.position = CGPoint(x: size.width - sideWallW - barW / 2, y: 0)
+            node.addChild(slab)
 
-        // Score sensor in gap
-        let sensor = SKNode()
-        sensor.position = CGPoint(x: gapCX, y: h + 6)
-        let sb = SKPhysicsBody(rectangleOf: CGSize(width: gapWidth - 20, height: 8))
-        sb.isDynamic = false
-        sb.categoryBitMask = scoreCat
-        sb.contactTestBitMask = planeCat
-        sb.collisionBitMask = 0
-        sensor.physicsBody = sb
-        node.addChild(sensor)
+            let sensor = makeScoreSensor(width: openW, height: h)
+            sensor.position = CGPoint(x: sideWallW + openW / 2, y: h + 6)
+            node.addChild(sensor)
+        }
+        nextSideIsLeft.toggle()
 
         addChild(node)
 
@@ -174,6 +166,17 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
             SKAction.moveBy(x: 0, y: dist, duration: dur),
             SKAction.removeFromParent()
         ]))
+    }
+
+    private func makeScoreSensor(width: CGFloat, height: CGFloat) -> SKNode {
+        let sensor = SKNode()
+        let sb = SKPhysicsBody(rectangleOf: CGSize(width: max(width - 10, 4), height: 8))
+        sb.isDynamic = false
+        sb.categoryBitMask = scoreCat
+        sb.contactTestBitMask = planeCat
+        sb.collisionBitMask = 0
+        sensor.physicsBody = sb
+        return sensor
     }
 
     private func makeSlab(width: CGFloat, height: CGFloat) -> SKNode {
