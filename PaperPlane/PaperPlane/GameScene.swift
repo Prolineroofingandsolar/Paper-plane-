@@ -199,7 +199,7 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         addChild(node)
 
         let dist = size.height + h + 30
-        let dur  = TimeInterval(dist / max(effectiveScroll, 60))
+        let dur  = TimeInterval(dist / max(scrollSpeed, 60))
         node.run(SKAction.sequence([
             SKAction.moveBy(x: 0, y: dist, duration: dur),
             SKAction.removeFromParent()
